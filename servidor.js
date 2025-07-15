@@ -26,6 +26,20 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     users.delete(socket.username);
     io.emit('userList', Array.from(users));
+    socket.broadcast.emit('user-disconnected', socket.id);
+  });
+
+  // WebRTC signaling
+  socket.on('offer', (data) => {
+    socket.broadcast.emit('offer', { id: socket.id, ...data });
+  });
+
+  socket.on('answer', (data) => {
+    socket.to(data.to).emit('answer', { id: socket.id, sdp: data.sdp });
+  });
+
+  socket.on('candidate', (data) => {
+    socket.to(data.to).emit('candidate', { id: socket.id, candidate: data.candidate });
   });
 });
 

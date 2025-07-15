@@ -1,7 +1,7 @@
 {
-  "name": "meu-aniversario-transilvania",
+  "name": "meu-aniversario-webrtc",
   "version": "1.0.0",
-  "description": "Site com chat e webcam para assistir juntos via RTMP",
+  "description": "Site com WebRTC e chat",
   "main": "servidor.js",
   "scripts": {
     "start": "node servidor.js"
