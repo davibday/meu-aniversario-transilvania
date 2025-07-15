@@ -118,7 +118,7 @@
         <div id="userList"></div>
         <button onclick="startWebcam()">Ligar minha webcam</button>
         <button onclick="stopWebcam()">Desligar webcam</button>
-        <button onclick="toggleMic()">Ativar/Desativar microfone</button>
+        
       </div>
       <div id="chat">
         <h3>Chat</h3>
@@ -166,9 +166,9 @@
 
     async function startWebcam() {
       if (userStream) return;
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       
-socket.emit('ready');
+socket.emit('new-user');
       myID = socket.id;
 
       const video = document.createElement('video');
@@ -189,11 +189,12 @@ socket.emit('ready');
       if (myVid) myVid.remove();
     }
 
-    function toggleMic() {
+    // função de microfone removida
+function toggleMic() {
       if (!localStream) return;
       const audioTrack = localStream.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
+        // microfone desativado
         alert(audioTrack.enabled ? "Microfone ativado" : "Microfone desligado");
       }
     }
@@ -224,20 +225,16 @@ socket.emit('ready');
     });
 
     
-socket.on('ready', async () => {
-  for (let id in peers) return;
-  socket.emit('offer-request');
-});
-
-socket.on('offer-request', async () => {
-  for (let id in peers) return;
-  for (let id of Object.keys(peers)) return;
-  const pc = createPeerConnection(socket.id);
-  peers[socket.id] = pc;
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  socket.emit('offer', { id: socket.id, sdp: offer.sdp });
+socket.on('new-user', async () => {
+  for (const id in peers) {
+    if (id === socket.id) continue;
+    const pc = createPeerConnection(id);
+    peers[id] = pc;
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('offer', { id: socket.id, sdp: pc.localDescription.sdp });
+  }
 });
 
 socket.on('offer', async ({ id, sdp }) => {
