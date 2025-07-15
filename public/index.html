@@ -167,7 +167,8 @@
     async function startWebcam() {
       if (userStream) return;
       localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      socket.emit('offer', { sdp: null });
+      
+socket.emit('ready');
       myID = socket.id;
 
       const video = document.createElement('video');
@@ -222,7 +223,25 @@
       myID = socket.id;
     });
 
-    socket.on('offer', async ({ id }) => {
+    
+socket.on('ready', async () => {
+  for (let id in peers) return;
+  socket.emit('offer-request');
+});
+
+socket.on('offer-request', async () => {
+  for (let id in peers) return;
+  for (let id of Object.keys(peers)) return;
+  const pc = createPeerConnection(socket.id);
+  peers[socket.id] = pc;
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit('offer', { id: socket.id, sdp: offer.sdp });
+});
+
+socket.on('offer', async ({ id, sdp }) => {
+
       if (id === socket.id) return;
       const pc = createPeerConnection(id);
       peers[id] = pc;
