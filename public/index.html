@@ -183,9 +183,9 @@
       }
     }
 
-    socket.on('chatMessage', ({ user, text }) => {
+    socket.on('chatMessage', (msg) => {
       const log = document.getElementById('chatLog');
-      log.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
+      log.innerHTML += `<div><strong>${msg.user}:</strong> ${msg.text}</div>`;
       log.scrollTop = log.scrollHeight;
     });
 
