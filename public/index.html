@@ -65,6 +65,7 @@
       width: 100%;
       padding: 10px;
       font-size: 15px;
+      box-sizing: border-box;
     }
     #webcams {
       display: flex;
@@ -105,7 +106,7 @@
       <div id="chat">
         <h3>Chat</h3>
         <div id="chatLog"></div>
-        <input type="text" id="chatInput" style="box-sizing: border-box;" placeholder="Escreva algo..." onkeypress="handleChat(event)" />
+        <input type="text" id="chatInput" placeholder="Escreva algo..." onkeypress="handleChat(event)" />
       </div>
     </div>
     <div id="webcams"></div>
@@ -116,17 +117,16 @@
     const socket = io();
     let userStream = null;
     let userVideoElement = null;
-    let username = '';
+    let username = ''; // Agora corretamente definido no escopo global
 
-    let username = '';
-function login() {
+    function login() {
       username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       if (password === 'abracadabra' && username.trim() !== '') {
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('mainApp').classList.add('active');
         loadVideoStream();
-        socket.emit('setUsername', username); window.username = username;
+        socket.emit('setUsername', username);
       } else {
         alert('Senha incorreta ou nome de usuário inválido.');
       }
@@ -178,16 +178,16 @@ function login() {
         const input = document.getElementById('chatInput');
         const message = input.value;
         if (message.trim() !== '') {
-          socket.emit('chatMessage', { user: window.username, text: message });
+          socket.emit('chatMessage', { user: username, text: message });
           input.value = '';
         }
       }
     }
 
-    socket.on('chatMessage', (msg) => { const log = document.getElementById('chatLog');   });
+    socket.on('chatMessage', (msg) => {
       const log = document.getElementById('chatLog');
-      
-      
+      log.innerHTML += `<div><strong>${msg.user}:</strong> ${msg.text}</div>`;
+      log.scrollTop = log.scrollHeight;
     });
 
     socket.on('userList', (users) => {
