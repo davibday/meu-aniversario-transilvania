@@ -1,5 +1,4 @@
 
-// servidor.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -14,20 +13,18 @@ const users = new Set();
 app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
-  let username = '';
-
   socket.on('setUsername', (name) => {
-    username = name;
+    socket.username = name;
     users.add(name);
     io.emit('userList', Array.from(users));
   });
 
   socket.on('chatMessage', (msg) => {
-    io.emit('chatMessage', { user: username, text: msg });
+    io.emit('chatMessage', { user: socket.username || 'Anônimo', text: msg });
   });
 
   socket.on('disconnect', () => {
-    users.delete(username);
+    users.delete(socket.username);
     io.emit('userList', Array.from(users));
   });
 });
