@@ -3,32 +3,27 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Meu Aniversário na Transilvânia</title>
-  <script src="/socket.io/socket.io.js">
-    function toggleMic() {
-      if (!localStream) return;
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        alert(audioTrack.enabled ? "Microfone ativado" : "Microfone desligado");
-      }
-    }
-    </script>
-
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background-color: #0d0d0d;
-      color: white;
+      color: #fff;
       display: flex;
       flex-direction: column;
       align-items: center;
+      height: 100vh;
     }
     #loginScreen, #mainApp {
       display: none;
       flex-direction: column;
       align-items: center;
+      padding: 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 12px;
       margin-top: 20px;
     }
     #loginScreen.active, #mainApp.active {
@@ -39,18 +34,72 @@
       padding: 10px;
       font-size: 16px;
     }
-    #videoGrid {
+    button {
+      background: #6610f2;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #mainLayout {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
       justify-content: center;
+      align-items: flex-start;
+      gap: 20px;
+      width: 100%;
+      max-width: 1400px;
       margin-top: 20px;
     }
-    video {
-      width: 240px;
-      height: 180px;
-      border: 2px solid #6610f2;
+    #videoPlayer {
+      width: 1024px;
+      height: 576px;
       background: black;
+    }
+    #chat {
+      width: 520px;
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px solid #6610f2;
+    }
+    #chatLog {
+      background: #222;
+      height: 320px;
+      overflow-y: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    #chatInput {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+    #webcams {
+      display: flex;
+      flex-direction: row-reverse;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px;
+      background-color: #1a1a1a;
+      width: 100%;
+      position: fixed;
+      bottom: 0;
+      border-top: 2px solid #6610f2;
+    }
+    #webcams video {
+      width: 160px;
+      height: 120px;
+      background: black;
+      border: 2px solid #6610f2;
+      border-radius: 5px;
+    }
+    #userList {
+      width: 1024px;
+      color: #aaa;
+      font-size: 14px;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -63,46 +112,118 @@
   </div>
 
   <div id="mainApp">
-    <h3>Bem-vindo, <span id="userDisplay"></span>!</h3>
-    <button onclick="toggleMic()">Ativar/Desativar microfone</button>
-    <div id="videoGrid">
-      <video id="localVideo" autoplay muted playsinline></video>
+    <div id="mainLayout">
+      <div>
+        <video id="videoPlayer" controls autoplay></video>
+        <div id="userList"></div>
+        <button onclick="startWebcam()">Ligar minha webcam</button>
+        <button onclick="stopWebcam()">Desligar webcam</button>
+        <button onclick="toggleMic()">Ativar/Desativar microfone</button>
+      </div>
+      <div id="chat">
+        <h3>Chat</h3>
+        <div id="chatLog"></div>
+        <input type="text" id="chatInput" placeholder="Escreva algo..." onkeypress="handleChat(event)" />
+      </div>
     </div>
+    <div id="webcams"></div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
     const socket = io();
+    let userStream = null;
+    let userVideoElement = null;
+    let username = '';
     let localStream;
     let peers = {};
     let myID = '';
-    let username = '';
 
-    async function login() {
+    function login() {
       username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       if (password === 'abracadabra' && username.trim() !== '') {
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('mainApp').classList.add('active');
-        document.getElementById('userDisplay').innerText = username;
+        loadVideoStream();
         socket.emit('setUsername', username);
-        await startCamera();
       } else {
-        alert('Senha ou nome inválido!');
+        alert('Senha incorreta ou nome de usuário inválido.');
       }
     }
 
-    async function startCamera() {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      document.getElementById('localVideo').srcObject = localStream;
-      socket.emit('offer', { sdp: null }); // sinalização inicial
+    function loadVideoStream() {
+      const video = document.getElementById('videoPlayer');
+      const streamUrl = 'https://meuaniversario-na-transilvania.stream/hls/re_9978154_e621ea544e49739f49be.m3u8';
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+      }
     }
+
+    async function startWebcam() {
+      if (userStream) return;
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      socket.emit('offer', { sdp: null });
+      myID = socket.id;
+
+      const video = document.createElement('video');
+      video.srcObject = localStream;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      video.id = socket.id;
+      document.getElementById('webcams').appendChild(video);
+    }
+
+    function stopWebcam() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      const myVid = document.getElementById(socket.id);
+      if (myVid) myVid.remove();
+    }
+
+    function toggleMic() {
+      if (!localStream) return;
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        alert(audioTrack.enabled ? "Microfone ativado" : "Microfone desligado");
+      }
+    }
+
+    function handleChat(e) {
+      if (e.key === 'Enter') {
+        const input = document.getElementById('chatInput');
+        const message = input.value;
+        if (message.trim() !== '') {
+          socket.emit('chatMessage', message);
+          input.value = '';
+        }
+      }
+    }
+
+    socket.on('chatMessage', ({ user, text }) => {
+      const log = document.getElementById('chatLog');
+      log.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
+      log.scrollTop = log.scrollHeight;
+    });
+
+    socket.on('userList', (users) => {
+      document.getElementById('userList').innerText = 'Presentes: ' + users.join(', ');
+    });
 
     socket.on('connect', () => {
       myID = socket.id;
     });
 
     socket.on('offer', async ({ id }) => {
-      if (id === myID) return;
+      if (id === socket.id) return;
       const pc = createPeerConnection(id);
       peers[id] = pc;
       localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -143,8 +264,8 @@
           remoteVideo = document.createElement('video');
           remoteVideo.id = id;
           remoteVideo.autoplay = true;
-          remoteVideo.playsinline = true;
-          document.getElementById('videoGrid').appendChild(remoteVideo);
+          remoteVideo.playsInline = true;
+          document.getElementById('webcams').appendChild(remoteVideo);
         }
         remoteVideo.srcObject = event.streams[0];
       };
@@ -155,16 +276,6 @@
       };
       return pc;
     }
-  
-    function toggleMic() {
-      if (!localStream) return;
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        alert(audioTrack.enabled ? "Microfone ativado" : "Microfone desligado");
-      }
-    }
-    </script>
-
+  </script>
 </body>
 </html>
