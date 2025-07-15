@@ -105,7 +105,7 @@
       <div id="chat">
         <h3>Chat</h3>
         <div id="chatLog"></div>
-        <input type="text" id="chatInput" placeholder="Escreva algo..." onkeypress="handleChat(event)" />
+        <input type="text" id="chatInput" style="box-sizing: border-box;" placeholder="Escreva algo..." onkeypress="handleChat(event)" />
       </div>
     </div>
     <div id="webcams"></div>
@@ -177,7 +177,7 @@
         const input = document.getElementById('chatInput');
         const message = input.value;
         if (message.trim() !== '') {
-          socket.emit('chatMessage', message);
+          socket.emit('chatMessage', { user: username, text: message });
           input.value = '';
         }
       }
