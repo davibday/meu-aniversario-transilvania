@@ -118,14 +118,15 @@
     let userVideoElement = null;
     let username = '';
 
-    function login() {
+    let username = '';
+function login() {
       username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       if (password === 'abracadabra' && username.trim() !== '') {
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('mainApp').classList.add('active');
         loadVideoStream();
-        socket.emit('setUsername', username);
+        socket.emit('setUsername', username); window.username = username;
       } else {
         alert('Senha incorreta ou nome de usuário inválido.');
       }
@@ -177,16 +178,16 @@
         const input = document.getElementById('chatInput');
         const message = input.value;
         if (message.trim() !== '') {
-          socket.emit('chatMessage', { user: username, text: message });
+          socket.emit('chatMessage', { user: window.username, text: message });
           input.value = '';
         }
       }
     }
 
-    socket.on('chatMessage', (msg) => {
+    socket.on('chatMessage', (msg) => { const log = document.getElementById('chatLog');   });
       const log = document.getElementById('chatLog');
-      log.innerHTML += `<div><strong>${msg.user}:</strong> ${msg.text}</div>`;
-      log.scrollTop = log.scrollHeight;
+      
+      
     });
 
     socket.on('userList', (users) => {
