@@ -1,0 +1,13 @@
+{
+  "name": "meu-aniversario-transilvania",
+  "version": "1.0.0",
+  "description": "Site com chat e webcam para assistir juntos via RTMP",
+  "main": "servidor.js",
+  "scripts": {
+    "start": "node servidor.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
