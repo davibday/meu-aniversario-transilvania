@@ -3,7 +3,6 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Meu Aniversário na Transilvânia</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
@@ -11,19 +10,15 @@
       margin: 0;
       font-family: Arial, sans-serif;
       background-color: #0d0d0d;
-      color: #fff;
+      color: white;
       display: flex;
       flex-direction: column;
       align-items: center;
-      height: 100vh;
     }
     #loginScreen, #mainApp {
       display: none;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
-      background-color: rgba(0, 0, 0, 0.7);
-      border-radius: 12px;
       margin-top: 20px;
     }
     #loginScreen.active, #mainApp.active {
@@ -34,72 +29,18 @@
       padding: 10px;
       font-size: 16px;
     }
-    button {
-      background: #6610f2;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    #mainLayout {
+    #videoGrid {
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      gap: 20px;
-      width: 100%;
-      max-width: 1400px;
-      margin-top: 20px;
-    }
-    #videoPlayer {
-      width: 1024px;
-      height: 576px;
-      background: black;
-    }
-    #chat {
-      width: 520px;
-      background: #1a1a1a;
-      padding: 15px;
-      border-radius: 10px;
-      border: 2px solid #6610f2;
-    }
-    #chatLog {
-      background: #222;
-      height: 320px;
-      overflow-y: auto;
-      padding: 10px;
-      margin-bottom: 10px;
-      font-size: 11px;
-    }
-    #chatInput {
-      width: 100%;
-      padding: 10px;
-      font-size: 15px;
-      box-sizing: border-box;
-    }
-    #webcams {
-      display: flex;
-      flex-direction: row-reverse;
-      justify-content: flex-start;
       flex-wrap: wrap;
       gap: 10px;
-      padding: 10px;
-      background-color: #1a1a1a;
-      width: 100%;
-      position: fixed;
-      bottom: 0;
-      border-top: 2px solid #6610f2;
+      justify-content: center;
+      margin-top: 20px;
     }
-    #webcams video {
-      width: 160px;
-      height: 120px;
-      background: black;
+    video {
+      width: 240px;
+      height: 180px;
       border: 2px solid #6610f2;
-      border-radius: 5px;
-    }
-    #userList {
-      width: 1024px;
-      color: #aaa;
-      font-size: 14px;
-      margin-top: 5px;
+      background: black;
     }
   </style>
 </head>
@@ -112,154 +53,99 @@
   </div>
 
   <div id="mainApp">
-    <div id="mainLayout">
-      <div>
-        <video id="videoPlayer" controls autoplay></video>
-        <div id="userList"></div>
-        <button onclick="startWebcam()">Ligar minha webcam</button>
-        <button onclick="stopWebcam()">Desligar webcam</button>
-        
-      </div>
-      <div id="chat">
-        <h3>Chat</h3>
-        <div id="chatLog"></div>
-        <input type="text" id="chatInput" placeholder="Escreva algo..." onkeypress="handleChat(event)" />
-      </div>
+    <h3>Bem-vindo, <span id="userDisplay"></span>!</h3>
+    <div id="videoGrid">
+      <video id="localVideo" autoplay muted playsinline></video>
     </div>
-    <div id="webcams"></div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
     const socket = io();
-    let userStream = null;
-    let userVideoElement = null;
-    let username = '';
+    const peers = {};
     let localStream;
-    let peers = {};
     let myID = '';
+    let username = '';
 
-    function login() {
+    async function login() {
       username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       if (password === 'abracadabra' && username.trim() !== '') {
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('mainApp').classList.add('active');
-        loadVideoStream();
+        document.getElementById('userDisplay').innerText = username;
         socket.emit('setUsername', username);
+        await startCamera();
       } else {
-        alert('Senha incorreta ou nome de usuário inválido.');
+        alert('Senha ou nome inválido!');
       }
     }
 
-    function loadVideoStream() {
-      const video = document.getElementById('videoPlayer');
-      const streamUrl = 'https://meuaniversario-na-transilvania.stream/hls/re_9978154_e621ea544e49739f49be.m3u8';
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(streamUrl);
-        hls.attachMedia(video);
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = streamUrl;
-      }
-    }
-
-    async function startWebcam() {
-      if (userStream) return;
+    async function startCamera() {
       localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      
-socket.emit('new-user');
-      myID = socket.id;
-
-      const video = document.createElement('video');
-      video.srcObject = localStream;
-      video.autoplay = true;
-      video.playsInline = true;
-      video.muted = true;
-      video.id = socket.id;
-      document.getElementById('webcams').appendChild(video);
+      document.getElementById('localVideo').srcObject = localStream;
+      socket.emit('join-room');
     }
 
-    function stopWebcam() {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-      }
-      const myVid = document.getElementById(socket.id);
-      if (myVid) myVid.remove();
-    }
+    function createPeer(id) {
+      const pc = new RTCPeerConnection();
 
-    // função de microfone removida
-function toggleMic() {
-      if (!localStream) return;
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        // microfone desativado
-        alert(audioTrack.enabled ? "Microfone ativado" : "Microfone desligado");
-      }
-    }
-
-    function handleChat(e) {
-      if (e.key === 'Enter') {
-        const input = document.getElementById('chatInput');
-        const message = input.value;
-        if (message.trim() !== '') {
-          socket.emit('chatMessage', message);
-          input.value = '';
+      pc.onicecandidate = event => {
+        if (event.candidate) {
+          socket.emit('candidate', { to: id, candidate: event.candidate });
         }
-      }
+      };
+
+      pc.ontrack = event => {
+        let remoteVideo = document.getElementById(id);
+        if (!remoteVideo) {
+          remoteVideo = document.createElement('video');
+          remoteVideo.id = id;
+          remoteVideo.autoplay = true;
+          remoteVideo.playsinline = true;
+          document.getElementById('videoGrid').appendChild(remoteVideo);
+        }
+        remoteVideo.srcObject = event.streams[0];
+      };
+
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+      return pc;
     }
-
-    socket.on('chatMessage', ({ user, text }) => {
-      const log = document.getElementById('chatLog');
-      log.innerHTML += `<div><strong>${user}:</strong> ${text}</div>`;
-      log.scrollTop = log.scrollHeight;
-    });
-
-    socket.on('userList', (users) => {
-      document.getElementById('userList').innerText = 'Presentes: ' + users.join(', ');
-    });
 
     socket.on('connect', () => {
       myID = socket.id;
     });
 
-    
-socket.on('new-user', async () => {
-  for (const id in peers) {
-    if (id === socket.id) continue;
-    const pc = createPeerConnection(id);
-    peers[id] = pc;
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('offer', { id: socket.id, sdp: pc.localDescription.sdp });
-  }
-});
-
-socket.on('offer', async ({ id, sdp }) => {
-
-      if (id === socket.id) return;
-      const pc = createPeerConnection(id);
-      peers[id] = pc;
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit('answer', { to: id, sdp: offer.sdp });
+    socket.on('all-users', users => {
+      users.forEach(async id => {
+        const pc = createPeer(id);
+        peers[id] = pc;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('offer', { to: id, sdp: offer.sdp });
+      });
     });
 
-    socket.on('answer', async ({ id, sdp }) => {
-      const pc = peers[id] || createPeerConnection(id);
-      peers[id] = pc;
-      await pc.setRemoteDescription({ type: 'offer', sdp });
+    socket.on('offer', async ({ from, sdp }) => {
+      const pc = createPeer(from);
+      peers[from] = pc;
+      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      socket.emit('candidate', { to: id, candidate: null });
+      socket.emit('answer', { to: from, sdp: answer.sdp });
     });
 
-    socket.on('candidate', async ({ id, candidate }) => {
-      if (candidate && peers[id]) {
-        await peers[id].addIceCandidate(new RTCIceCandidate(candidate));
+    socket.on('answer', async ({ from, sdp }) => {
+      const pc = peers[from];
+      if (pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
+      }
+    });
+
+    socket.on('candidate', async ({ from, candidate }) => {
+      const pc = peers[from];
+      if (pc && candidate) {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
       }
     });
 
@@ -271,27 +157,6 @@ socket.on('offer', async ({ id, sdp }) => {
         if (vid) vid.remove();
       }
     });
-
-    function createPeerConnection(id) {
-      const pc = new RTCPeerConnection();
-      pc.ontrack = (event) => {
-        let remoteVideo = document.getElementById(id);
-        if (!remoteVideo) {
-          remoteVideo = document.createElement('video');
-          remoteVideo.id = id;
-          remoteVideo.autoplay = true;
-          remoteVideo.playsInline = true;
-          document.getElementById('webcams').appendChild(remoteVideo);
-        }
-        remoteVideo.srcObject = event.streams[0];
-      };
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('candidate', { to: id, candidate: event.candidate });
-        }
-      };
-      return pc;
-    }
   </script>
 </body>
 </html>
